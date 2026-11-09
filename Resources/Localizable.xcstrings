@@ -17,6 +17,23 @@
         }
       }
     },
+    "ローマ字入力中に打った英単語を英字のまま入力します。「kyouhagoogledekensaku」→「きょうはgoogleでけんさく」のように、日本語と英語を切り替えずに打てます。製品名やサービス名は、変換候補に正しい表記も出します（iphone → iPhone）。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keeps English words as letters while typing Japanese with romaji, so you can type Japanese and English without switching, e.g., 'kyouhagoogledekensaku' → 'きょうはgoogleでけんさく'. Product and service names also get a candidate with their correct spelling (iphone → iPhone)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ""
+          }
+        }
+      }
+    },
     "・'year='yyyy → year=1234（固定文字は'で囲みます）" : {
       "localizations" : {
         "en" : {
@@ -6751,6 +6768,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Create shareable link"
+          }
+        }
+      }
+    },
+    "日英混在入力（ベータ版）" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixed Japanese and English Input (Beta)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ""
           }
         }
       }

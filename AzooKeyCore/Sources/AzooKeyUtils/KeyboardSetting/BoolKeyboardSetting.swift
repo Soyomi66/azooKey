@@ -87,6 +87,17 @@ public extension KeyboardSettingKey where Self == EnglishCandidate {
     static var englishCandidate: Self { .init() }
 }
 
+public struct MixedLanguageRomanInput: BoolKeyboardSettingKey {
+    public static let title: LocalizedStringKey = "日英混在入力（ベータ版）"
+    public static let explanation: LocalizedStringKey = "ローマ字入力中に打った英単語を英字のまま入力します。「kyouhagoogledekensaku」→「きょうはgoogleでけんさく」のように、日本語と英語を切り替えずに打てます。製品名やサービス名は、変換候補に正しい表記も出します（iphone → iPhone）。"
+    public static let defaultValue = false
+    public static let key: String = "mixed_language_roman_input"
+}
+
+public extension KeyboardSettingKey where Self == MixedLanguageRomanInput {
+    static var mixedLanguageRomanInput: Self { .init() }
+}
+
 public struct MemoryResetFlag: BoolKeyboardSettingKey {
     public static let title: LocalizedStringKey = "学習のリセット"
     public static let explanation: LocalizedStringKey = "学習履歴を全て消去します。この操作は取り消せません。"

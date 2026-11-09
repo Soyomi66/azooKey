@@ -9,6 +9,7 @@
 import AzooKeyUtils
 import Foundation
 import KanaKanjiConverterModule
+import KeyboardExtensionUtils
 import SwiftUtils
 
 // ライブ変換を管理するためのクラス
@@ -17,6 +18,8 @@ final class LiveConversionManager {
         self.enabled = enabled
     }
     var enabled = false
+    /// 英単語を1つの文節として扱うか（日英混在入力）。ダイレクト入力の英字は1文字ずつ別の語になるので、`python`の`p`だけを最初の文節として確定しないようにする
+    var keepsEnglishWordsInOneClause = false
 
     private(set) var isFirstClauseCompletion: Bool = false
     // 現在ディスプレイに表示されている候補
@@ -45,7 +48,11 @@ final class LiveConversionManager {
         var data = newCandidate.data[...]
         var count = 0
         while !data.isEmpty {
-            var clause = Candidate.makePrefixClauseCandidate(data: data)
+            var clause = if self.keepsEnglishWordsInOneClause {
+                MixedLanguageComposer.makePrefixClauseCandidate(data: data)
+            } else {
+                Candidate.makePrefixClauseCandidate(data: data)
+            }
             // ローマ字向けに補正処理を入れる
             if count == 0, let first = firstClauseCandidates.first(where: {$0.text == clause.text}) {
                 clause.composingCount = first.composingCount

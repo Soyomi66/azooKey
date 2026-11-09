@@ -143,6 +143,8 @@ struct SettingsHomeView: View {
                     .searchKeys("Zenzai", "エフォート", "詳細設定")
                     BoolSettingView(.englishCandidate)
                         .searchKeys("英単語変換", "変換", "英語", "英語変換")
+                    BoolSettingView(.mixedLanguageRomanInput)
+                        .searchKeys("日英混在入力", "英語", "英字", "ローマ字", "切り替え")
                     BoolSettingView(.typographyLetter)
                         .searchKeys("太字", "フォント", "タイポグラフィ", "装飾文字")
                     MarkedTextSettingView(.markedTextSetting)

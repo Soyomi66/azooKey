@@ -32,6 +32,12 @@ final class InputManager {
     var isSelected = false
     /// かな漢字変換を受け持つ変換器。
     @MainActor private lazy var kanaKanjiConverter = KanaKanjiConverter.withDefaultDictionary()
+    /// 日英混在入力で英単語を調べる
+    @MainActor private lazy var englishWordChecker = SystemEnglishWordChecker()
+    /// 日英混在入力で英単語を見分ける
+    @MainActor private lazy var mixedLanguageSegmenter = MixedLanguageSegmenter(englishWordChecker: self.englishWordChecker)
+    /// 日英混在入力で前回判定した英字の区間の始まり（`composingText.input`の位置）
+    private var mixedLanguageRunStartIndex: Int?
 
     init() {
         @KeyboardSetting(.liveConversion) var liveConversion
@@ -350,6 +356,7 @@ final class InputManager {
     @MainActor func complete(candidate: Candidate) {
         self.updateLog(candidate: candidate)
         self.composingText.prefixComplete(composingCount: candidate.composingCount)
+        self.mixedLanguageRunStartIndex = nil
         self.displayedTextManager.updateComposingText(composingText: self.composingText, completedPrefix: candidate.text, isSelected: self.isSelected)
         self.kanaKanjiConverter.updateLearningData(candidate)
         guard !self.composingText.isEmpty else {
@@ -392,6 +399,7 @@ final class InputManager {
         self.isSelected = false
         composingText.insertAtCursorPosition(text, inputStyle: inputStyle)
         self.composingText = composingText
+        self.mixedLanguageRunStartIndex = nil
         self.displayedTextManager.updateComposingText(completedPrefix: candidate.text, composingText: composingText, newLiveConversionText: nil)
         self.setResult()
         return true
@@ -400,6 +408,7 @@ final class InputManager {
     /// 入力を停止する。DisplayedTextには特に何もしない。
     @MainActor func stopComposition() {
         self.composingText.stopComposition()
+        self.mixedLanguageRunStartIndex = nil
         self.displayedTextManager.stopComposition()
         self.liveConversionManager.stopComposition()
         self.kanaKanjiConverter.stopComposition()
@@ -438,6 +447,14 @@ final class InputManager {
         if self.composingText.isEmpty {
             return []
         }
+        // 日英混在入力: 確定する前に、末尾の子音も英字として判定し直す（`want`の`t`など）
+        if shouldModifyDisplayedText, self.applyMixedLanguageInput(isFinal: true), liveConversionEnabled {
+            // ライブ変換の結果を、書き換えた入力で作り直す
+            self.setResult()
+            if self.composingText.isEmpty {
+                return []
+            }
+        }
         var candidate: Candidate
         if liveConversionEnabled, let _candidate = liveConversionManager.lastUsedCandidate {
             candidate = _candidate
@@ -465,6 +482,7 @@ final class InputManager {
         self.updateLog(candidate: candidate)
         if shouldModifyDisplayedText {
             self.composingText.prefixComplete(composingCount: candidate.composingCount)
+            self.mixedLanguageRunStartIndex = nil
             self.displayedTextManager.updateComposingText(composingText: self.composingText, completedPrefix: candidate.text, isSelected: self.isSelected)
         }
         if #available(iOS 27.0, *), !shouldModifyDisplayedText {
@@ -516,11 +534,45 @@ final class InputManager {
             self.deleteSelection()
         }
         self.composingText.insertAtCursorPosition(text, inputStyle: inputStyle)
+        if inputStyle == .roman2kana {
+            self.applyMixedLanguageInput(isFinal: false)
+        }
         debug("Input Manager input:", composingText)
         if requireSetResult {
             // 変換を実施する
             self.setResult()
         }
+    }
+
+    /// 日英混在入力を使うか
+    @MainActor private var mixedLanguageInputEnabled: Bool {
+        @KeyboardSetting(.mixedLanguageRomanInput) var mixedLanguageRomanInput
+        return mixedLanguageRomanInput && self.keyboardLanguage == .ja_JP
+    }
+
+    /// 日英混在入力: 末尾に続けて打った英字のうち、英単語と判定した部分をダイレクト入力に切り替える
+    /// - Parameter isFinal: 確定する直前の判定か
+    /// - Returns: `composingText`を書き換えたか
+    @MainActor @discardableResult
+    private func applyMixedLanguageInput(isFinal: Bool) -> Bool {
+        guard self.mixedLanguageInputEnabled, !self.isSelected else {
+            self.mixedLanguageRunStartIndex = nil
+            return false
+        }
+        let result = MixedLanguageComposer.apply(
+            to: self.composingText,
+            runStartIndex: self.mixedLanguageRunStartIndex,
+            segmenter: self.mixedLanguageSegmenter,
+            isFinal: isFinal,
+            precededByEnglish: MixedLanguageComposer.isEnglishSentenceContext(
+                self.displayedTextManager.documentContextBeforeInput(ignoreComposition: true) ?? ""
+            )
+        )
+        self.mixedLanguageRunStartIndex = result.runStartIndex
+        if result.changed {
+            self.composingText = result.composingText
+        }
+        return result.changed
     }
 
     private func shouldDirectInsert(text: String, simpleInsert: Bool) -> Bool {
@@ -996,7 +1048,13 @@ final class InputManager {
         debug("InputManager.setResult: value to be input", inputData)
         let options = self.getConvertRequestOptions(inputStylePreference: inputData.input.last?.inputStyle)
         debug("InputManager.setResult: options", options)
-        let results = self.kanaKanjiConverter.requestCandidates(inputData, options: options)
+        var results = self.kanaKanjiConverter.requestCandidates(inputData, options: options)
+        // 日英混在入力: 英単語の途中で切れる候補を除き、固有名詞の正しい表記（iphone → iPhone）の候補を足す
+        let mixedLanguageInputEnabled = self.mixedLanguageInputEnabled
+        if mixedLanguageInputEnabled {
+            results = MixedLanguageComposer.adjustingCandidates(results, composingText: inputData, checker: self.englishWordChecker)
+        }
+        self.liveConversionManager.keepsEnglishWordsInOneClause = mixedLanguageInputEnabled
 
         // 表示を更新する
         if !self.isSelected {
